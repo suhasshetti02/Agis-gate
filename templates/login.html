@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Secure Access{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="shield-logo">
+                <div class="shield-hex">⬡</div>
+                <div class="shield-inner">✦</div>
+            </div>
+            <h1 class="auth-title">AEGIS<span>GATE</span></h1>
+            <p class="auth-subtitle">Cryptographic Network Access Control</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group-aegis">
+                <label class="form-label-aegis">USERNAME</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-person input-icon"></i>
+                    <input type="text" name="username" class="input-aegis" placeholder="enter username" required autocomplete="username">
+                </div>
+            </div>
+
+            <div class="form-group-aegis">
+                <label class="form-label-aegis">PASSWORD</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-lock input-icon"></i>
+                    <input type="password" name="password" class="input-aegis" placeholder="••••••••" required autocomplete="current-password">
+                    <button type="button" class="toggle-pw" onclick="togglePw(this)">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <input type="hidden" name="device_fingerprint" id="deviceFingerprint">
+            <input type="hidden" name="device_name" id="deviceName">
+            <input type="hidden" name="behavioral_data" id="behavioralData">
+
+            <div class="device-status-bar" id="deviceStatus">
+                <span class="ds-dot ds-scanning"></span>
+                <span class="ds-label">Scanning device signature...</span>
+            </div>
+
+            <button type="submit" class="btn-aegis-primary" id="loginBtn">
+                <span class="btn-text">AUTHENTICATE</span>
+                <span class="btn-icon"><i class="bi bi-arrow-right-circle"></i></span>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <a href="{{ url_for('auth.register') }}">Create Account</a>
+            <span class="sep">·</span>
+            <span class="version-tag">v2.0 · RSA-2048</span>
+        </div>
+    </div>
+
+    <div class="auth-side-info">
+        <div class="info-panel">
+            <div class="info-item">
+                <i class="bi bi-key-fill"></i>
+                <span>RSA Challenge-Response</span>
+            </div>
+            <div class="info-item">
+                <i class="bi bi-cpu"></i>
+                <span>AI Risk Scoring</span>
+            </div>
+            <div class="info-item">
+                <i class="bi bi-shield-shaded"></i>
+                <span>Device Trust Verification</span>
+            </div>
+            <div class="info-item">
+                <i class="bi bi-clock-history"></i>
+                <span>Session Auto-Renewal</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/device.js') }}"></script>
+<script src="{{ url_for('static', filename='js/behavior.js') }}"></script>
+<script>
+function togglePw(btn) {
+    const input = btn.previousElementSibling;
+    const icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+</script>
+{% endblock %}

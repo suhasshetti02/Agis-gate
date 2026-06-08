@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Profile{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="shield-logo small">
+                <div class="shield-hex">⬡</div>
+                <div class="shield-inner"><i class="bi bi-person-gear"></i></div>
+            </div>
+            <h1 class="auth-title">USER <span>PROFILE</span></h1>
+            <p class="auth-subtitle">{{ user.username }} | {{ user.email }}</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('dashboard.profile') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group-aegis">
+                <label class="form-label-aegis">CURRENT PASSWORD</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-lock input-icon"></i>
+                    <input type="password" name="current_password" class="input-aegis" placeholder="Enter current password" required>
+                </div>
+            </div>
+
+            <div class="form-group-aegis">
+                <label class="form-label-aegis">NEW PASSWORD</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-key input-icon"></i>
+                    <input type="password" name="new_password" class="input-aegis" placeholder="min 8 characters" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-aegis-primary">
+                <span class="btn-text">CHANGE PASSWORD</span>
+                <span class="btn-icon"><i class="bi bi-check-circle"></i></span>
+            </button>
+        </form>
+
+        <div class="auth-footer mt-4">
+            <a href="{{ url_for('dashboard.index') }}">← Back to Dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

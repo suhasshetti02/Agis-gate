@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Risk Overview{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="page-header admin-header">
+        <div>
+            <h2 class="page-title">RISK <span>INTELLIGENCE</span></h2>
+            <p class="page-sub">AI-generated risk evaluations · {{ scores|length }} records</p>
+        </div>
+        <div class="admin-nav-pills">
+            <a href="{{ url_for('admin.index') }}" class="pill">← Dashboard</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body">
+            <table class="aegis-table">
+                <thead>
+                    <tr>
+                        <th>Time</th><th>User</th><th>Device</th>
+                        <th>Score</th><th>Action</th><th>AI Risk Reasons</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for s in scores %}
+                <tr>
+                    <td class="mono small">{{ s.evaluated_at[:16] }}</td>
+                    <td>{{ s.username }}</td>
+                    <td>{{ s.device_name or '—' }}</td>
+                    <td>
+                        <div class="risk-pill {% if s.score >= 0.75 %}rp-high{% elif s.score >= 0.45 %}rp-medium{% else %}rp-low{% endif %}">
+                            {{ '%.4f'|format(s.score) }}
+                        </div>
+                    </td>
+                    <td><span class="action-tag action-{{ s.action_taken }}">{{ s.action_taken|upper }}</span></td>
+                    <td class="mono small">
+                        {% if s.reasons %}
+                            <ul style="margin:0; padding-left:1em;">
+                            {% for reason in s.reasons %}
+                                <li>{{ reason }}</li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

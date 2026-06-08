@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Admin Devices{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="page-header admin-header">
+        <div>
+            <h2 class="page-title"><span>DEVICE</span> REGISTRY</h2>
+            <p class="page-sub">{{ devices|length }} registered devices across all users</p>
+        </div>
+        <div class="admin-nav-pills">
+            <a href="{{ url_for('admin.index') }}" class="pill">← Dashboard</a>
+            <a href="{{ url_for('admin.users') }}" class="pill">Users</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem;">
+            <h3 style="margin: 0;">Device Registry</h3>
+            <input type="text" id="searchInput" placeholder="Search devices..." class="input-aegis" style="width: 250px; padding: 0.5rem;" onkeyup="filterTable()">
+        </div>
+        <div class="panel-body">
+            <table class="aegis-table" id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Device Name</th><th>Owner</th><th>Fingerprint</th>
+                        <th>Trust Score</th><th>Logins</th><th>Status</th>
+                        <th>Registered</th><th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for d in devices %}
+                <tr class="{% if d.is_blocked %}row-blocked{% endif %}">
+                    <td><strong>{{ d.device_name }}</strong></td>
+                    <td>{{ d.username }}</td>
+                    <td class="mono small">{{ d.device_fingerprint[:20] }}...</td>
+                    <td>
+                        <div class="mini-bar-wrap">
+                            <div class="mini-bar {% if d.trust_score >= 0.7 %}high{% elif d.trust_score >= 0.4 %}med{% else %}low{% endif %}"
+                                 style="width: {{ d.trust_score * 100 }}%"></div>
+                        </div>
+                        <span class="small">{{ '%.0f'|format(d.trust_score * 100) }}%</span>
+                    </td>
+                    <td>{{ d.login_count }}</td>
+                    <td>
+                        {% if d.is_blocked %}<span class="tag-blocked">BLOCKED</span>
+                        {% elif d.is_trusted %}<span class="tag-trusted">TRUSTED</span>
+                        {% else %}<span class="tag-pending">STANDARD</span>{% endif %}
+                    </td>
+                    <td class="small">{{ d.registered_at[:10] }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('admin.device_action', device_id=d.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            {% if d.is_blocked %}
+                            <input type="hidden" name="action" value="unblock">
+                            <button type="submit" class="btn-aegis-sm success">Unblock</button>
+                            {% else %}
+                            <input type="hidden" name="action" value="block">
+                            <button type="submit" class="btn-aegis-sm danger" onclick="return confirm('Block this device?')">Block</button>
+                            {% endif %}
+                        </form>
+                        {% if d.is_trusted and not d.is_blocked %}
+                        <form method="POST" action="{{ url_for('admin.device_action', device_id=d.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="revoke">
+                            <button type="submit" class="btn-aegis-sm" onclick="return confirm('Revoke trust for this device?')">Revoke</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script>
+function filterTable() {
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById("dataTable");
+    const tr = table.getElementsByTagName("tr");
+    
+    for (let i = 1; i < tr.length; i++) {
+        let textValue = tr[i].textContent || tr[i].innerText;
+        if (textValue.toUpperCase().indexOf(filter) > -1) {
+            tr[i].style.display = "";
+        } else {
+            tr[i].style.display = "none";
+        }
+    }
+}
+</script>
+{% endblock %}

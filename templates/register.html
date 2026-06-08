@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Register{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="shield-logo small">
+                <div class="shield-hex">⬡</div>
+                <div class="shield-inner">+</div>
+            </div>
+            <h1 class="auth-title">CREATE <span>ACCOUNT</span></h1>
+            <p class="auth-subtitle">Register to access the secure network</p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.register') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group-aegis">
+                <label class="form-label-aegis">USERNAME</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-person input-icon"></i>
+                    <input type="text" name="username" class="input-aegis" placeholder="choose a username" required>
+                </div>
+            </div>
+
+            <div class="form-group-aegis">
+                <label class="form-label-aegis">EMAIL</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-envelope input-icon"></i>
+                    <input type="email" name="email" class="input-aegis" placeholder="institute email" required>
+                </div>
+            </div>
+
+            <div class="form-group-aegis">
+                <label class="form-label-aegis">PASSWORD</label>
+                <div class="input-wrapper">
+                    <i class="bi bi-lock input-icon"></i>
+                    <input type="password" name="password" class="input-aegis" placeholder="min 8 characters" required>
+                </div>
+            </div>
+
+            <div class="password-rules">
+                <span>✓ Minimum 8 characters</span>
+                <span>✓ Store your credentials securely</span>
+            </div>
+
+            <button type="submit" class="btn-aegis-primary">
+                <span class="btn-text">REGISTER</span>
+                <span class="btn-icon"><i class="bi bi-person-plus"></i></span>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            Already have an account? <a href="{{ url_for('auth.login') }}">Sign In</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

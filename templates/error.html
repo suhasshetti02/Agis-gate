@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Error {{ code }}{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card" style="text-align:center;">
+        <div class="shield-logo">
+            <div class="shield-hex">⬡</div>
+            <div class="shield-inner">✕</div>
+        </div>
+        <h1 class="auth-title" style="color:var(--aegis-red);">{{ code }}</h1>
+        <p class="auth-subtitle" style="margin-top:8px;">{{ message }}</p>
+        <div style="margin-top:28px;">
+            <a href="{{ url_for('auth.login') }}" class="btn-aegis-primary" style="justify-content:center;">
+                Return to Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

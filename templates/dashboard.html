@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">ACCESS <span>GRANTED</span></h2>
+            <p class="page-sub">Welcome back, <strong>{{ user.username }}</strong> · Network Status: <span class="status-active">AUTHORIZED</span></p>
+        </div>
+        <div class="risk-badge" data-score="{{ '%.2f'|format(risk_score) }}">
+            <div class="risk-ring"></div>
+            <div class="risk-value">{{ '%.0f'|format(risk_score * 100) }}<small>%</small></div>
+            <div class="risk-label">RISK</div>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <i class="bi bi-phone stat-icon"></i>
+            <div class="stat-value">{{ devices|length }}</div>
+            <div class="stat-label">Registered Devices</div>
+            <div class="stat-bar">
+                <div class="stat-fill" style="width: {{ (devices|length / 3) * 100 }}%"></div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i class="bi bi-broadcast stat-icon"></i>
+            <div class="stat-value">{{ sessions|length }}</div>
+            <div class="stat-label">Active Sessions</div>
+        </div>
+        <div class="stat-card">
+            <i class="bi bi-shield-check stat-icon"></i>
+            <div class="stat-value">{{ devices|selectattr('is_trusted', 'equalto', 1)|list|length }}</div>
+            <div class="stat-label">Trusted Devices</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value text-sm">{{ user.last_login[:16] if user.last_login else 'N/A' }}</div>
+            <div class="stat-label">Last Login</div>
+        </div>
+        <div class="stat-card">
+            <i class="bi bi-keyboard stat-icon"></i>
+            <div class="stat-value">{{ "%.1f"|format(behavioral_profile.typing_speed_kps) if behavioral_profile else '—' }} <span style="font-size:0.5em">kps</span></div>
+            <div class="stat-label">Typing Speed</div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Devices -->
+        <div class="panel">
+            <div class="panel-header">
+                <h3><i class="bi bi-laptop"></i> My Devices</h3>
+                <a href="{{ url_for('dashboard.devices') }}" class="panel-action">Manage →</a>
+            </div>
+            <div class="panel-body">
+                {% if devices %}
+                {% for d in devices[:3] %}
+                <div class="device-row">
+                    <div class="device-icon {% if d.is_blocked %}blocked{% elif d.is_trusted %}trusted{% endif %}">
+                        <i class="bi bi-{% if d.is_trusted %}shield-check{% elif d.is_blocked %}shield-x{% else %}shield{% endif %}"></i>
+                    </div>
+                    <div class="device-info">
+                        <div class="device-name">{{ d.device_name }}</div>
+                        <div class="device-meta">
+                            Trust: {{ '%.0f'|format(d.trust_score * 100) }}% ·
+                            Logins: {{ d.login_count }} ·
+                            {% if d.is_trusted %}<span class="tag-trusted">TRUSTED</span>{% endif %}
+                            {% if d.is_blocked %}<span class="tag-blocked">BLOCKED</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="device-score-bar">
+                        <div class="score-fill" style="width: {{ d.trust_score * 100 }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state">No devices registered.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Active Sessions -->
+        <div class="panel">
+            <div class="panel-header">
+                <h3><i class="bi bi-broadcast"></i> Active Sessions</h3>
+            </div>
+            <div class="panel-body">
+                {% if sessions %}
+                {% for s in sessions %}
+                <div class="session-row">
+                    <div class="session-info">
+                        <div class="session-device">
+                            {{ s.device_name }}
+                            {% if s.is_trusted_session %}
+                            <span class="tag-trusted" style="font-size: 0.7em; margin-left: 0.5rem;">TRUSTED SESSION</span>
+                            {% else %}
+                            <span class="tag-blocked" style="font-size: 0.7em; margin-left: 0.5rem; background: var(--bg-tertiary); color: var(--text-muted); border: 1px solid var(--border-color);">STANDARD SESSION</span>
+                            {% endif %}
+                        </div>
+                        <div class="session-meta">{{ s.ip_address }} · Created: {{ s.created_at[:16] }}</div>
+                        <div class="session-expires">Expires: {{ s.expires_at[:16] }}</div>
+                    </div>
+                    <form method="POST" action="{{ url_for('dashboard.revoke_session', session_id=s.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-revoke" title="Revoke">
+                            <i class="bi bi-x-circle"></i>
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state">No active sessions.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Risk History -->
+        <div class="panel wide">
+            <div class="panel-header">
+                <h3><i class="bi bi-activity"></i> Recent Risk Evaluations</h3>
+            </div>
+            <div class="panel-body">
+                {% if risk_history %}
+                <table class="aegis-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Device</th>
+                            <th>Score</th>
+                            <th>Action</th>
+                            <th>AI Risk Reasons</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for r in risk_history %}
+                    <tr>
+                        <td class="mono">{{ r.evaluated_at[:16] }}</td>
+                        <td>{{ r.device_name or '—' }}</td>
+                        <td>
+                            <div class="risk-pill {% if r.score >= 0.75 %}rp-high{% elif r.score >= 0.45 %}rp-medium{% else %}rp-low{% endif %}">
+                                {{ '%.2f'|format(r.score) }}
+                            </div>
+                        </td>
+                        <td><span class="action-tag action-{{ r.action_taken }}">{{ r.action_taken|upper }}</span></td>
+                        <td class="mono small">
+                            {% if r.reasons %}
+                                <ul style="margin:0; padding-left:1em;">
+                                {% for reason in r.reasons %}
+                                    <li>{{ reason }}</li>
+                                {% endfor %}
+                                </ul>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">No risk evaluations yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

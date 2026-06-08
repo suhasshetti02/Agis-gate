@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Security Challenge{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card wide">
+        <div class="auth-header">
+            <div class="shield-logo pulse">
+                <div class="shield-hex">⬡</div>
+                <div class="shield-inner">⚠</div>
+            </div>
+            <h1 class="auth-title">SECURITY <span>CHALLENGE</span></h1>
+            <p class="auth-subtitle">Elevated risk detected — cryptographic verification required</p>
+        </div>
+
+        <div class="challenge-box">
+            <div class="challenge-step">
+                <div class="step-num">01</div>
+                <div class="step-content">
+                    <h3>Risk Detected</h3>
+                    <p>Your login pattern triggered an elevated risk score. Sign the challenge nonce to verify device ownership.</p>
+                </div>
+            </div>
+            <div class="challenge-step">
+                <div class="step-num">02</div>
+                <div class="step-content">
+                    <h3>Nonce</h3>
+                    <code class="nonce-display" id="nonceDisplay">{{ nonce }}</code>
+                </div>
+            </div>
+            <div class="challenge-step">
+                <div class="step-num">03</div>
+                <div class="step-content">
+                    <h3>Sign & Submit</h3>
+                    <p>Your stored private key will sign the challenge automatically.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="challenge-status" id="challengeStatus">
+            <div class="status-line">
+                <span class="status-dot idle"></span>
+                <span id="statusText">Waiting to sign...</span>
+            </div>
+        </div>
+
+        <button class="btn-aegis-primary" onclick="performChallenge()">
+            <span class="btn-text">SIGN CHALLENGE</span>
+            <span class="btn-icon"><i class="bi bi-pencil-square"></i></span>
+        </button>
+
+        <div class="auth-footer mt-3">
+            <a href="{{ url_for('auth.login') }}">← Cancel and return to login</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/device.js') }}"></script>
+<script>
+const nonce = "{{ nonce }}";
+
+async function performChallenge() {
+    const statusText = document.getElementById('statusText');
+    const statusDot = document.querySelector('.status-dot');
+
+    statusText.textContent = 'Loading private key...';
+    statusDot.className = 'status-dot active';
+
+    const deviceFp = localStorage.getItem('aegis_device_fp');
+    if (!deviceFp) {
+        statusText.textContent = '✗ Device fingerprint not found.';
+        statusDot.className = 'status-dot error';
+        return;
+    }
+
+    const privateKey = await AegisCrypto.getPrivateKey(deviceFp);
+    if (!privateKey) {
+        statusText.textContent = '✗ No private key found in local secure storage. Please re-register device.';
+        statusDot.className = 'status-dot error';
+        return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const challengeStr = `${nonce}|${deviceFp}|${timestamp}`;
+
+    statusText.textContent = 'Signing challenge with RSA private key...';
+
+    try {
+        const signatureB64 = await AegisCrypto.signChallenge(privateKey, challengeStr);
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        const res = await fetch('{{ url_for("auth.verify_challenge") }}', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                nonce: nonce,
+                signature: signatureB64,
+                timestamp: timestamp
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            statusText.textContent = '✓ Challenge verified! Redirecting...';
+            statusDot.className = 'status-dot success';
+            setTimeout(() => window.location.href = data.redirect, 800);
+        } else {
+            statusText.textContent = '✗ ' + (data.message || 'Verification failed');
+            statusDot.className = 'status-dot error';
+        }
+    } catch (e) {
+        statusText.textContent = '✗ Network error during verification';
+        statusDot.className = 'status-dot error';
+        console.error(e);
+    }
+}
+</script>
+{% endblock %}

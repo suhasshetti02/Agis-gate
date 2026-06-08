@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="page-header admin-header">
+        <div>
+            <h2 class="page-title"><span>ADMIN</span> CONTROL</h2>
+            <p class="page-sub">System Overview · Real-time Monitoring</p>
+        </div>
+        <div class="admin-nav-pills">
+            <a href="{{ url_for('admin.users') }}" class="pill">Users</a>
+            <a href="{{ url_for('admin.devices') }}" class="pill">Devices</a>
+            <a href="{{ url_for('admin.logs') }}" class="pill">Logs</a>
+            <a href="{{ url_for('admin.audit') }}" class="pill">Audit</a>
+            <a href="{{ url_for('admin.risk_overview') }}" class="pill">Risk</a>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="admin-stats-grid">
+        <div class="admin-stat-card">
+            <i class="bi bi-people"></i>
+            <div class="asv">{{ stats.total_users }}</div>
+            <div class="asl">Total Users</div>
+        </div>
+        <div class="admin-stat-card">
+            <i class="bi bi-laptop"></i>
+            <div class="asv">{{ stats.total_devices }}</div>
+            <div class="asl">Registered Devices</div>
+        </div>
+        <div class="admin-stat-card highlight">
+            <i class="bi bi-broadcast"></i>
+            <div class="asv">{{ stats.active_sessions }}</div>
+            <div class="asl">Active Sessions</div>
+        </div>
+        <div class="admin-stat-card warning">
+            <i class="bi bi-person-x"></i>
+            <div class="asv">{{ stats.blocked_users }}</div>
+            <div class="asl">Blocked Users</div>
+        </div>
+        <div class="admin-stat-card warning">
+            <i class="bi bi-phone-vibrate"></i>
+            <div class="asv">{{ stats.blocked_devices }}</div>
+            <div class="asl">Blocked Devices</div>
+        </div>
+        <div class="admin-stat-card">
+            <i class="bi bi-calendar-day"></i>
+            <div class="asv">{{ stats.attempts_today }}</div>
+            <div class="asl">Attempts Today</div>
+        </div>
+        <div class="admin-stat-card danger">
+            <i class="bi bi-exclamation-triangle"></i>
+            <div class="asv">{{ stats.failed_today }}</div>
+            <div class="asl">Failed Today</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="admin-charts-row">
+        <div class="panel">
+            <div class="panel-header"><h3><i class="bi bi-bar-chart"></i> Login Activity (7 days)</h3></div>
+            <div class="panel-body chart-panel">
+                <canvas id="activityChart" height="200"></canvas>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-header"><h3><i class="bi bi-pie-chart"></i> Risk Distribution</h3></div>
+            <div class="panel-body chart-panel">
+                <canvas id="riskChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Attempts -->
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="bi bi-clock-history"></i> Recent Login Attempts</h3>
+            <a href="{{ url_for('admin.logs') }}" class="panel-action">View All →</a>
+        </div>
+        <div class="panel-body">
+            <table class="aegis-table">
+                <thead>
+                    <tr><th>Time</th><th>User</th><th>IP</th><th>Status</th><th>Risk</th><th>Reason</th></tr>
+                </thead>
+                <tbody>
+                {% for a in recent_attempts %}
+                <tr>
+                    <td class="mono">{{ a.attempted_at[:16] }}</td>
+                    <td>{{ a.username_tried }}</td>
+                    <td class="mono">{{ a.ip_address }}</td>
+                    <td><span class="status-badge status-{{ a.status }}">{{ a.status }}</span></td>
+                    <td>
+                        <div class="risk-pill {% if a.risk_score >= 0.75 %}rp-high{% elif a.risk_score >= 0.45 %}rp-medium{% else %}rp-low{% endif %}">
+                            {{ '%.2f'|format(a.risk_score or 0) }}
+                        </div>
+                    </td>
+                    <td class="small">{{ a.block_reason or '—' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/admin_charts.js') }}"></script>
+{% endblock %}

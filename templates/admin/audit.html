@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Audit Log{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="page-header admin-header">
+        <div>
+            <h2 class="page-title">AUDIT <span>TRAIL</span></h2>
+            <p class="page-sub">System audit events · {{ entries|length }} records</p>
+        </div>
+        <div class="admin-nav-pills">
+            <a href="{{ url_for('admin.index') }}" class="pill">← Dashboard</a>
+            <a href="{{ url_for('admin.logs') }}" class="pill">Login Logs</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body">
+            <table class="aegis-table">
+                <thead>
+                    <tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr>
+                </thead>
+                <tbody>
+                {% for e in entries %}
+                <tr>
+                    <td class="mono small">{{ e.created_at[:16] }}</td>
+                    <td>{{ e.username or 'system' }}</td>
+                    <td><span class="action-tag action-{{ e.action }}">{{ e.action }}</span></td>
+                    <td class="small">{{ e.details or '—' }}</td>
+                    <td class="mono small">{{ e.ip_address or '—' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

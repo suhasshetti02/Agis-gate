@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Admin Users{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="page-header admin-header">
+        <div>
+            <h2 class="page-title"><span>USER</span> MANAGEMENT</h2>
+            <p class="page-sub">{{ users|length }} registered users</p>
+        </div>
+        <div class="admin-nav-pills">
+            <a href="{{ url_for('admin.index') }}" class="pill">← Dashboard</a>
+            <a href="{{ url_for('admin.devices') }}" class="pill">Devices</a>
+            <a href="{{ url_for('admin.logs') }}" class="pill">Logs</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem;">
+            <h3 style="margin: 0;">User List</h3>
+            <input type="text" id="searchInput" placeholder="Search users..." class="input-aegis" style="width: 250px; padding: 0.5rem;" onkeyup="filterTable()">
+        </div>
+        <div class="panel-body">
+            <table class="aegis-table" id="dataTable">
+                <thead>
+                    <tr>
+                        <th>#</th><th>Username</th><th>Email</th><th>Devices</th>
+                        <th>Failed Attempts</th><th>Status</th><th>Joined</th><th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for u in users %}
+                <tr class="{% if u.is_blocked %}row-blocked{% endif %}">
+                    <td>{{ u.id }}</td>
+                    <td><strong>{{ u.username }}</strong></td>
+                    <td class="mono small">{{ u.email }}</td>
+                    <td>{{ u.device_count }}/3</td>
+                    <td>
+                        <span class="{% if u.failed_attempts >= 5 %}text-danger{% elif u.failed_attempts >= 3 %}text-warning{% endif %}">
+                            {{ u.failed_attempts }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if u.is_blocked %}
+                        <span class="tag-blocked">BLOCKED</span>
+                        {% else %}
+                        <span class="tag-trusted">ACTIVE</span>
+                        {% endif %}
+                    </td>
+                    <td class="small">{{ u.created_at[:10] }}</td>
+                    <td style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <form method="POST" action="{{ url_for('admin.user_action', user_id=u.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            {% if u.is_blocked %}
+                            <input type="hidden" name="action" value="unblock">
+                            <button type="submit" class="btn-aegis-sm success" title="Unblock User">Unblock</button>
+                            {% else %}
+                            <input type="hidden" name="action" value="block">
+                            <button type="submit" class="btn-aegis-sm danger" title="Block User" onclick="return confirm('Block {{ u.username }}?')">Block</button>
+                            {% endif %}
+                        </form>
+                        {% if u.failed_attempts > 0 %}
+                        <form method="POST" action="{{ url_for('admin.user_action', user_id=u.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="reset_failed">
+                            <button type="submit" class="btn-aegis-sm warning" title="Reset Failed Attempts">Reset</button>
+                        </form>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('admin.user_action', user_id=u.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="delete">
+                            <button type="submit" class="btn-aegis-sm danger" title="Delete User" onclick="return confirm('WARNING: Permanently delete {{ u.username }} and all associated data? This cannot be undone.')"><i class="bi bi-trash"></i></button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script>
+function filterTable() {
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById("dataTable");
+    const tr = table.getElementsByTagName("tr");
+    
+    for (let i = 1; i < tr.length; i++) {
+        let textValue = tr[i].textContent || tr[i].innerText;
+        if (textValue.toUpperCase().indexOf(filter) > -1) {
+            tr[i].style.display = "";
+        } else {
+            tr[i].style.display = "none";
+        }
+    }
+}
+</script>
+{% endblock %}

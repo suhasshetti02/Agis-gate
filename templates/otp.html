@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — OTP Verification{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="shield-logo">
+                <div class="shield-hex">⬡</div>
+                <div class="shield-inner">📱</div>
+            </div>
+            <h1 class="auth-title">DEVICE <span>VERIFY</span></h1>
+            <p class="auth-subtitle">New device detected — OTP sent to your email</p>
+        </div>
+
+        <div class="otp-info-box">
+            <i class="bi bi-info-circle"></i>
+            Check <strong>logs/otp_delivery.log</strong> for the OTP code (simulated email delivery).
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.register_device_otp') }}" id="otpForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group-aegis">
+                <label class="form-label-aegis">6-DIGIT OTP CODE</label>
+                <div class="otp-inputs" id="otpInputs">
+                    <input type="text" maxlength="1" class="otp-digit" data-index="0" inputmode="numeric">
+                    <input type="text" maxlength="1" class="otp-digit" data-index="1" inputmode="numeric">
+                    <input type="text" maxlength="1" class="otp-digit" data-index="2" inputmode="numeric">
+                    <span class="otp-sep">—</span>
+                    <input type="text" maxlength="1" class="otp-digit" data-index="3" inputmode="numeric">
+                    <input type="text" maxlength="1" class="otp-digit" data-index="4" inputmode="numeric">
+                    <input type="text" maxlength="1" class="otp-digit" data-index="5" inputmode="numeric">
+                </div>
+                <input type="hidden" name="otp" id="otpHidden">
+            </div>
+
+            <div class="form-group-aegis" id="keySection">
+                <label class="form-label-aegis">DEVICE PUBLIC KEY (RSA)</label>
+                <textarea name="public_key" id="publicKeyField" class="input-aegis" rows="4"
+                          placeholder="Generating RSA keypair locally..." readonly></textarea>
+                <input type="hidden" name="public_key" id="pubKeyHidden">
+                <div class="key-actions">
+                    <button type="button" class="btn-aegis-sm" onclick="generateAndSetKey()">
+                        <i class="bi bi-key"></i> Generate Key
+                    </button>
+                    <span class="key-status" id="keyStatus">No key generated</span>
+                </div>
+                <p class="key-note">Your private key is generated and stored locally in this browser. Only the public key is uploaded to the server.</p>
+            </div>
+
+            <button type="submit" class="btn-aegis-primary" id="submitOtp" disabled>
+                <span class="btn-text">VERIFY & REGISTER DEVICE</span>
+                <span class="btn-icon"><i class="bi bi-shield-check"></i></span>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <a href="{{ url_for('auth.login') }}">← Back to Login</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/device.js') }}"></script>
+<script>
+// OTP digit auto-advance
+const digits = document.querySelectorAll('.otp-digit');
+digits.forEach((d, i) => {
+    d.addEventListener('input', () => {
+        if (d.value && i < digits.length - 1) digits[i + 1].focus();
+        updateOtpHidden();
+        checkReady();
+    });
+    d.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !d.value && i > 0) digits[i - 1].focus();
+    });
+});
+
+function updateOtpHidden() {
+    document.getElementById('otpHidden').value = [...digits].map(d => d.value).join('');
+}
+
+let keyGenerated = false;
+
+async function generateAndSetKey() {
+    document.getElementById('keyStatus').textContent = 'Generating locally...';
+    try {
+        const fp = localStorage.getItem('aegis_device_fp');
+        if (!fp) throw new Error("Device fingerprint missing");
+
+        const keys = await AegisCrypto.generateDeviceKeyPair();
+        
+        document.getElementById('publicKeyField').value = keys.publicKeyPem;
+        document.getElementById('pubKeyHidden').value = keys.publicKeyPem;
+        
+        // Securely store the private key in IndexedDB for future logins
+        await AegisCrypto.storePrivateKey(fp, keys.privateKey);
+        
+        document.getElementById('keyStatus').textContent = '✓ Local key secured';
+        document.getElementById('keyStatus').style.color = 'var(--aegis-green)';
+        keyGenerated = true;
+        checkReady();
+    } catch (e) {
+        document.getElementById('keyStatus').textContent = 'Error generating key';
+        console.error(e);
+    }
+}
+
+function checkReady() {
+    const otp = document.getElementById('otpHidden').value;
+    document.getElementById('submitOtp').disabled = !(otp.length === 6 && keyGenerated);
+}
+
+// Handle form submission: use pubKeyHidden not textarea
+document.getElementById('otpForm').addEventListener('submit', function(e) {
+    const textarea = document.getElementById('publicKeyField');
+    textarea.removeAttribute('name'); // prevent duplicate submission
+});
+
+// Auto-generate key on load
+window.addEventListener('load', generateAndSetKey);
+</script>
+{% endblock %}

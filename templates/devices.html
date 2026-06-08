@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — My Devices{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">DEVICE <span>REGISTRY</span></h2>
+            <p class="page-sub">Manage your registered devices · Max {{ config.MAX_DEVICES_PER_USER }} devices allowed</p>
+        </div>
+        <a href="{{ url_for('dashboard.index') }}" class="btn-aegis-sm">← Dashboard</a>
+    </div>
+
+    <div class="devices-grid">
+        {% if devices %}
+        {% for d in devices %}
+        <div class="device-card {% if d.is_blocked %}card-blocked{% elif d.is_trusted %}card-trusted{% endif %}">
+            <div class="device-card-header">
+                <div class="device-card-icon">
+                    <i class="bi bi-{% if d.is_trusted %}shield-check{% elif d.is_blocked %}shield-x{% else %}laptop{% endif %}"></i>
+                </div>
+                <div>
+                    <div class="device-card-name">{{ d.device_name }}</div>
+                    <div class="device-card-status">
+                        {% if d.is_blocked %}<span class="tag-blocked">BLOCKED</span>
+                        {% elif d.is_trusted %}<span class="tag-trusted">TRUSTED</span>
+                        {% else %}<span class="tag-pending">STANDARD</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="device-card-body">
+                <div class="trust-meter">
+                    <span>Trust Score</span>
+                    <div class="trust-bar-wrap">
+                        <div class="trust-bar-fill {% if d.trust_score >= 0.7 %}high{% elif d.trust_score >= 0.4 %}med{% else %}low{% endif %}"
+                             style="width: {{ d.trust_score * 100 }}%"></div>
+                    </div>
+                    <span class="trust-val">{{ '%.0f'|format(d.trust_score * 100) }}%</span>
+                </div>
+
+                <div class="device-meta-list">
+                    <div class="dmeta-item">
+                        <span class="dmeta-key">FINGERPRINT</span>
+                        <span class="dmeta-val mono">{{ d.device_fingerprint[:16] }}...</span>
+                    </div>
+                    <div class="dmeta-item">
+                        <span class="dmeta-key">REGISTERED</span>
+                        <span class="dmeta-val">{{ d.registered_at[:16] }}</span>
+                    </div>
+                    <div class="dmeta-item">
+                        <span class="dmeta-key">LAST SEEN</span>
+                        <span class="dmeta-val">{{ d.last_seen[:16] if d.last_seen else 'Never' }}</span>
+                    </div>
+                    <div class="dmeta-item">
+                        <span class="dmeta-key">LOGINS</span>
+                        <span class="dmeta-val">{{ d.login_count }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="device-card-actions">
+                <form method="POST" action="{{ url_for('dashboard.trust_dev', device_id=d.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {% if d.is_trusted %}
+                    <input type="hidden" name="action" value="untrust">
+                    <button type="submit" class="btn-device-action untrust">
+                        <i class="bi bi-shield-minus"></i> Untrust
+                    </button>
+                    {% else %}
+                    <input type="hidden" name="action" value="trust">
+                    <button type="submit" class="btn-device-action trust">
+                        <i class="bi bi-shield-plus"></i> Trust
+                    </button>
+                    {% endif %}
+                </form>
+                <form method="POST" action="{{ url_for('dashboard.remove_dev', device_id=d.id) }}" class="d-inline"
+                      onsubmit="return confirm('Remove this device? You will need to re-register it.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-device-action remove">
+                        <i class="bi bi-trash"></i> Remove
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if devices|length < config.MAX_DEVICES_PER_USER %}
+        <div class="device-card card-add">
+            <div class="add-device-hint">
+                <i class="bi bi-plus-circle"></i>
+                <p>New device? Log in from it to register.</p>
+                <p class="small">{{ config.MAX_DEVICES_PER_USER - devices|length }} slot(s) remaining</p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state large">
+            <i class="bi bi-laptop"></i>
+            <p>No devices registered yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

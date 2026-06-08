@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Aegis-Gate — Login Logs{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <div class="page-header admin-header">
+        <div>
+            <h2 class="page-title">LOGIN <span>LOGS</span></h2>
+            <p class="page-sub">All authentication attempts · {{ attempts|length }} records</p>
+        </div>
+        <div class="admin-nav-pills">
+            <a href="{{ url_for('admin.index') }}" class="pill">← Dashboard</a>
+            <a href="{{ url_for('admin.audit') }}" class="pill">Audit Log</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-body">
+            <div class="table-filters mb-3">
+                <input type="text" id="logSearch" class="input-aegis small" placeholder="Filter logs...">
+            </div>
+            <table class="aegis-table" id="logTable">
+                <thead>
+                    <tr>
+                        <th>Time</th><th>User</th><th>IP</th><th>Device FP</th>
+                        <th>Status</th><th>Risk</th><th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for a in attempts %}
+                <tr class="log-row">
+                    <td class="mono small">{{ a.attempted_at[:16] }}</td>
+                    <td>{{ a.username_tried or '?' }}</td>
+                    <td class="mono">{{ a.ip_address }}</td>
+                    <td class="mono small">{{ a.device_fingerprint[:12] if a.device_fingerprint else '—' }}...</td>
+                    <td><span class="status-badge status-{{ a.status }}">{{ a.status }}</span></td>
+                    <td>
+                        <div class="risk-pill {% if (a.risk_score or 0) >= 0.75 %}rp-high{% elif (a.risk_score or 0) >= 0.45 %}rp-medium{% else %}rp-low{% endif %}">
+                            {{ '%.3f'|format(a.risk_score or 0) }}
+                        </div>
+                    </td>
+                    <td class="small">{{ a.block_reason or '—' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('logSearch').addEventListener('input', function() {
+    const term = this.value.toLowerCase();
+    document.querySelectorAll('.log-row').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}
