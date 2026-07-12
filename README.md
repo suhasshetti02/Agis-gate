@@ -443,7 +443,6 @@ The administrator can:
 
 Possible future enhancements include:
 
-- Real Email OTP Delivery
 - Mobile Application Integration
 - Multi-Factor Authentication (MFA)
 - Blockchain-Based Audit Logs

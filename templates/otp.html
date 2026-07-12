@@ -15,7 +15,7 @@
 
         <div class="otp-info-box">
             <i class="bi bi-info-circle"></i>
-            Check <strong>logs/otp_delivery.log</strong> for the OTP code (simulated email delivery).
+            We have sent a verification code to your registered college email.
         </div>
 
         <form method="POST" action="{{ url_for('auth.register_device_otp') }}" id="otpForm">
@@ -51,6 +51,9 @@
             <button type="submit" class="btn-aegis-primary" id="submitOtp" disabled>
                 <span class="btn-text">VERIFY & REGISTER DEVICE</span>
                 <span class="btn-icon"><i class="bi bi-shield-check"></i></span>
+            </button>
+            <button type="button" class="btn-aegis-sm" id="resendOtpBtn" style="width: 100%; margin-top: 10px; background: transparent; border: 1px solid var(--aegis-border);" onclick="resendOtp()" disabled>
+                Resend OTP (60s)
             </button>
         </form>
 
@@ -95,7 +98,11 @@ async function generateAndSetKey() {
         document.getElementById('pubKeyHidden').value = keys.publicKeyPem;
         
         // Securely store the private key in IndexedDB for future logins
-        await AegisCrypto.storePrivateKey(fp, keys.privateKey);
+        try {
+            await AegisCrypto.storePrivateKey(fp, keys.privateKey);
+        } catch (dbErr) {
+            console.warn("Could not save to IndexedDB. Device verification may fail next time.", dbErr);
+        }
         
         document.getElementById('keyStatus').textContent = '✓ Local key secured';
         document.getElementById('keyStatus').style.color = 'var(--aegis-green)';
@@ -120,5 +127,52 @@ document.getElementById('otpForm').addEventListener('submit', function(e) {
 
 // Auto-generate key on load
 window.addEventListener('load', generateAndSetKey);
+
+let resendCooldown = 60;
+let resendTimer = null;
+
+function updateResendButton() {
+    const btn = document.getElementById('resendOtpBtn');
+    if (resendCooldown > 0) {
+        btn.disabled = true;
+        btn.textContent = `Resend OTP (${resendCooldown}s)`;
+        resendCooldown--;
+        resendTimer = setTimeout(updateResendButton, 1000);
+    } else {
+        btn.disabled = false;
+        btn.textContent = 'Resend OTP';
+    }
+}
+
+async function resendOtp() {
+    const btn = document.getElementById('resendOtpBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    try {
+        const response = await fetch('/resend-otp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+            }
+        });
+        const data = await response.json();
+        if (data.success) {
+            alert(data.message);
+            resendCooldown = 60;
+            updateResendButton();
+        } else {
+            alert(data.message);
+            btn.disabled = false;
+            btn.textContent = 'Resend OTP';
+        }
+    } catch (e) {
+        alert('An error occurred. Please try again later.');
+        btn.disabled = false;
+        btn.textContent = 'Resend OTP';
+    }
+}
+
+window.addEventListener('load', updateResendButton);
 </script>
 {% endblock %}

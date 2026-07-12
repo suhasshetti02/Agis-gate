@@ -40,6 +40,13 @@ class Config:
     # Admin password must be provided via environment variable for security.
     ADMIN_PASSWORD: str = _require_env("ADMIN_PASSWORD")
 
+    # ── Email settings ───────────────────────────────────────────
+    EMAIL_HOST: str = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT: int = int(os.environ.get("EMAIL_PORT", 587))
+    EMAIL_USERNAME: str = os.environ.get("EMAIL_USERNAME", "")
+    EMAIL_PASSWORD: str = os.environ.get("EMAIL_PASSWORD", "")
+    EMAIL_FROM: str = os.environ.get("EMAIL_FROM", EMAIL_USERNAME)
+
     # ── Paths ────────────────────────────────────────────────────
     DATABASE_PATH = BASE_DIR / "db" / "aegis.db"
     KEYS_DIR      = BASE_DIR / "keys"

@@ -160,8 +160,11 @@ def login():
             session["pending_device_fp"]  = device_fp
             session["pending_device_name"] = device_name
             otp = generate_otp(user["id"], "device_registration")
-            deliver_otp(user["email"], otp)
-            flash("New device detected. An OTP has been sent to your registered email.", "info")
+            success = deliver_otp(user["id"], user["username"], user["email"], otp)
+            if success:
+                flash("We have sent a verification code to your registered college email.", "info")
+            else:
+                flash("Unable to send verification email. Please try again later.", "danger")
             return redirect(url_for("auth.register_device_otp"))
 
         if device["is_blocked"]:
@@ -315,6 +318,30 @@ def register_device_otp():
         return redirect(url_for("dashboard.index"))
 
     return render_template("otp.html")
+
+
+@auth_bp.route("/resend-otp", methods=["POST"])
+def resend_otp():
+    user_id = session.get("pending_user_id")
+    if not user_id:
+        return jsonify({"success": False, "message": "Session expired."}), 400
+
+    conn = get_db()
+    try:
+        user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    finally:
+        conn.close()
+
+    if not user:
+        return jsonify({"success": False, "message": "User not found."}), 400
+
+    otp = generate_otp(user_id, "device_registration")
+    success = deliver_otp(user_id, user["username"], user["email"], otp)
+    
+    if success:
+        return jsonify({"success": True, "message": "OTP resent to your college email."})
+    else:
+        return jsonify({"success": False, "message": "Unable to send verification email. Please try again later."}), 500
 
 
 # ─── Register User ──────────────────────────────────────────────────────────────

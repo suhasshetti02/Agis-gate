@@ -97,15 +97,28 @@ def verify_otp(user_id: int, otp_code: str, purpose: str = "device_registration"
     return True, "OTP verified successfully."
 
 
-def deliver_otp(user_email: str, otp_code: str, purpose: str = "device_registration"):
+def deliver_otp(user_id: int, username: str, user_email: str, otp_code: str, purpose: str = "device_registration") -> bool:
     """
-    Simulate OTP delivery. In production, send via SMTP.
-    For this simulation, write to a file in /logs.
+    Send OTP via real email using SMTP.
+    Logs the generation and delivery status to audit log.
     """
-    import os
-    from config import Config
-    os.makedirs(Config.LOGS_DIR, exist_ok=True)
-    log_path = Config.LOGS_DIR / "otp_delivery.log"
-    timestamp = datetime.utcnow().isoformat()
-    with open(log_path, "a") as f:
-        f.write(f"[{timestamp}] TO={user_email} | PURPOSE={purpose} | OTP={otp_code}\n")
+    from utils.email_service import EmailService
+    from utils.logger import log_audit
+    
+    # Log Generation
+    log_audit(user_id, "otp_generated", f"purpose={purpose}")
+    
+    success = EmailService.send_otp_email(username, user_email, otp_code)
+    status = "Delivered" if success else "Failed"
+    
+    # Log Sent
+    log_audit(user_id, "otp_sent", f"email={user_email} | status={status}")
+    
+    # Fallback log (for debugging and local delivery)
+    try:
+        with open("logs/otp_delivery.log", "a") as f:
+            f.write(f"[{datetime.utcnow().isoformat()}] OTP for {user_email}: {otp_code}\n")
+    except Exception:
+        pass
+    
+    return success
