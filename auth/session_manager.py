@@ -7,6 +7,10 @@ import secrets
 from datetime import datetime, timedelta
 from db.database import get_db
 from config import Config
+from network.network_controller import SimulatedNetworkController, NetworkAllocationError
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def create_session(user_id: int, device_id: int, ip_address: str, user_agent: str,
@@ -27,7 +31,23 @@ def create_session(user_id: int, device_id: int, ip_address: str, user_agent: st
             """,
             (user_id, device_id, token, expires_at.isoformat(), ip_address, user_agent),
         )
+        session_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
+        
+        # Phase 5: Network Access Control
+        # Determine if user is admin for VLAN
+        user = conn.execute("SELECT is_admin FROM users WHERE id=?", (user_id,)).fetchone()
+        is_admin = bool(user["is_admin"]) if user else False
+        
+        try:
+            SimulatedNetworkController.allocate_network(session_id, user_id, device_id, is_admin)
+        except NetworkAllocationError as e:
+            logger.error(f"Failed to provision network: {e}")
+            # If network provisioning fails, we should arguably fail the session, 
+            # but for simulated purposes we'll log it. An explicit failure state
+            # would be better if we wanted to enforce strict NAC.
+            pass
+            
     finally:
         conn.close()
     return token
@@ -132,6 +152,10 @@ def renew_trusted_session(token: str) -> str | None:
 def invalidate_session(token: str):
     conn = get_db()
     try:
+        session = conn.execute("SELECT id FROM sessions WHERE session_token=?", (token,)).fetchone()
+        if session:
+            SimulatedNetworkController.release_network(session["id"])
+            
         conn.execute("UPDATE sessions SET is_active=0 WHERE session_token=?", (token,))
         conn.commit()
     finally:
@@ -141,6 +165,10 @@ def invalidate_session(token: str):
 def invalidate_all_user_sessions(user_id: int):
     conn = get_db()
     try:
+        sessions = conn.execute("SELECT id FROM sessions WHERE user_id=? AND is_active=1", (user_id,)).fetchall()
+        for s in sessions:
+            SimulatedNetworkController.release_network(s["id"])
+            
         conn.execute("UPDATE sessions SET is_active=0 WHERE user_id=?", (user_id,))
         conn.commit()
     finally:

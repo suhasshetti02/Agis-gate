@@ -15,6 +15,7 @@ Unlike traditional systems that rely only on username and password authenticatio
 - Session Renewal
 - Audit Logging
 - Administrative Monitoring
+- Simulated Network Access Control (IP/VLAN Provisioning)
 
 The system follows a Defense-in-Depth approach where multiple independent security layers work together to verify both the user and the device before granting access.
 
@@ -103,6 +104,12 @@ Aegis-Gate addresses these issues by introducing device-based authentication, cr
 - Audit logs
 - Security analytics
 
+### Network Access Control (Simulated)
+
+- Stateful IP Address allocation
+- Role-based VLAN assignment (User vs Admin)
+- Session-based network provisioning
+
 ---
 
 # Technology Stack
@@ -141,6 +148,10 @@ aegis-gate/
 │
 ├── db/
 │   └── database.py
+│
+├── network/
+│   ├── network_controller.py
+│   └── __init__.py
 │
 ├── routes/
 │   ├── auth_routes.py
@@ -342,7 +353,7 @@ This reduces repeated logins while maintaining security.
 ## 1. Create Virtual Environment
 
 ```cmd
-python -m venv .venv
+python -m venv venv
 ```
 
 ---
@@ -350,7 +361,7 @@ python -m venv .venv
 ## 2. Activate Virtual Environment
 
 ```cmd
-.venv\Scripts\activate
+venv\Scripts\activate
 ```
 
 ---
@@ -377,6 +388,8 @@ Open the configuration file and set:
 ```cmd
 python app.py
 ```
+
+
 
 ---
 
@@ -439,19 +452,7 @@ The administrator can:
 
 ---
 
-# Future Scope
 
-Possible future enhancements include:
-
-- Mobile Application Integration
-- Multi-Factor Authentication (MFA)
-- Blockchain-Based Audit Logs
-- Geo-Location Risk Analysis
-- Continuous Authentication
-- Enterprise Network Integration
-- SIEM Integration
-
----
 
 # Viva Points
 
@@ -492,3 +493,12 @@ before granting access.
 # Conclusion
 
 Aegis-Gate is a multi-layered authentication and access control platform that combines cryptography, artificial intelligence, behavioral analysis, and device trust management to provide a secure and intelligent authentication experience for institutional environments.
+
+---
+
+# Screenshots
+
+![Screenshot 1](results/Screenshot%202026-08-30%20155315.png)
+![Screenshot 2](results/Screenshot%202026-08-30%20163003.png)
+![Screenshot 3](results/Screenshot%202026-08-30%20163018.png)
+![Screenshot 4](results/Screenshot%202026-08-30%20163040.png)

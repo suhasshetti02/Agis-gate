@@ -76,7 +76,8 @@ def verify_otp(user_id: int, otp_code: str, purpose: str = "device_registration"
             # Locked out due to too many failed attempts
             return False, "Too many failed attempts. Please login again to request a new OTP."
 
-        if correct_code != otp_code:
+        import secrets
+        if not secrets.compare_digest(correct_code, otp_code):
             failed_attempts += 1
             if failed_attempts >= 5:
                 # Lock it

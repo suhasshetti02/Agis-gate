@@ -34,186 +34,200 @@ def compute_risk_score(user_id: int, device_fingerprint: str = None,
     reasons = []
     score   = 0.0
 
-    conn = get_db()
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
-        user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-        if not user:
-            return {
-                "score": 1.0,
-                "category": "Critical Risk",
-                "reasons": ["User not found"],
-                "factors": {"user_not_found": 1.0},
-                "action": "block"
-            }
-
-        # ── Factor 1: Failed login attempts ───────────────────────
-        failed = user["failed_attempts"] or 0
-        if failed >= Config.MAX_FAILED_ATTEMPTS:
-            factors[RiskFactor.FAILED_ATTEMPTS] = 1.0
-            score += 0.4
-            reasons.append(f"Maximum failed attempts reached ({failed})")
-        elif failed >= 3:
-            factors[RiskFactor.FAILED_ATTEMPTS] = 0.6
-            score += 0.2
-            reasons.append(f"Multiple failed attempts ({failed})")
-        elif failed >= 1:
-            factors[RiskFactor.FAILED_ATTEMPTS] = 0.2
-            score += 0.05
-            reasons.append(f"Recent failed attempt ({failed})")
-
-        # ── Factor 2: Odd-hour login (2 AM – 5 AM UTC) ────────────
-        hour = datetime.utcnow().hour
-        if 2 <= hour <= 5:
-            factors[RiskFactor.ODD_HOUR_LOGIN] = 0.5
-            score += 0.1
-            reasons.append("Unusual login time (Late Night)")
-
-        # ── Factor 3 & 4: Device trust score + new device ─────────
-        device_age_days = 0.0
-        login_count = 0
-        if device_fingerprint:
-            device = conn.execute(
-                "SELECT * FROM devices WHERE device_fingerprint=?", (device_fingerprint,)
-            ).fetchone()
-
-            if device:
-                reg_date = datetime.fromisoformat(device["registered_at"])
-                device_age_days = (datetime.utcnow() - reg_date).days
-                login_count = device["login_count"]
-
-                trust = device["trust_score"]
-                if trust < 0.3:
-                    factors[RiskFactor.TRUST_SCORE_LOW] = 1.0 - trust
-                    score += 0.25
-                    reasons.append(f"Low device trust score ({round(trust, 2)})")
-                elif trust < 0.6:
-                    factors[RiskFactor.TRUST_SCORE_LOW] = 0.5
-                    score += 0.1
-                    reasons.append(f"Moderate device trust score ({round(trust, 2)})")
-
-                if device["is_blocked"]:
-                    factors[RiskFactor.BLOCKED_DEVICE] = 1.0
-                    score += 0.5
-                    reasons.append("Device is explicitly blocked")
-
-                if device["login_count"] == 0:
-                    factors[RiskFactor.NEW_DEVICE] = 0.4
-                    score += 0.15
-                    reasons.append("First login from this registered device")
-            else:
-                # Completely unknown device
-                factors[RiskFactor.NEW_DEVICE] = 0.8
-                score += 0.3
-                reasons.append("Unrecognized new device")
-        else:
-            reasons.append("No device fingerprint provided")
-            score += 0.2
-
-        # ── Factor 5: Device switching frequency ──────────────────
-        switching_factor = _compute_device_switching(user_id, conn)
-        if switching_factor > 0:
-            factors[RiskFactor.DEVICE_SWITCHING] = switching_factor
-            score += switching_factor * 0.2
-            reasons.append("High frequency of device switching")
-
-        # ── Factor 6: Rapid repeated requests ─────────────────────
-        if _detect_rapid_requests(user_id, conn):
-            factors[RiskFactor.RAPID_REQUESTS] = 0.7
-            score += 0.2
-            reasons.append("Rapid successive login requests detected")
-
-        # ── Factor 7: New IP address ──────────────────────────────
-        if ip_address:
-            ip_factor = _check_new_ip(user_id, ip_address, conn)
-            if ip_factor > 0:
-                factors[RiskFactor.NEW_IP] = ip_factor
-                score += ip_factor * 0.15
-                reasons.append("Login from a previously unseen IP address")
-
-        # ── Factor 8: OTP Failures ────────────────────────────────
+        conn = get_db()
         try:
-            otp_failures = conn.execute(
-                "SELECT SUM(failed_attempts) as cnt FROM otps WHERE user_id=? AND created_at > datetime('now', '-1 day')",
-                (user_id,)
-            ).fetchone()
-            if otp_failures and otp_failures["cnt"]:
-                cnt = otp_failures["cnt"]
-                factors[RiskFactor.OTP_FAILURES] = min(1.0, cnt * 0.2)
-                score += min(1.0, cnt * 0.2) * 0.2
-                reasons.append(f"{cnt} recent OTP verification failures")
-        except Exception:
-            pass
+            user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+            if not user:
+                return {
+                    "score": 1.0,
+                    "category": "Critical Risk",
+                    "reasons": ["User not found"],
+                    "factors": {"user_not_found": 1.0},
+                    "action": "block"
+                }
 
-        # ── Factor 9: Behavioral Biometrics ───────────────────────
-        if behavioral_data:
-            try:
-                current_behavior = json.loads(behavioral_data)
-                saved_behavior_str = user.get("behavioral_profile")
-                
-                if saved_behavior_str:
-                    saved_behavior = json.loads(saved_behavior_str)
-                    # Compare typing speed
-                    old_speed = saved_behavior.get("typing_speed_kps", 0)
-                    new_speed = current_behavior.get("typing_speed_kps", 0)
-                    
-                    if old_speed > 0 and new_speed > 0:
-                        diff_ratio = abs(new_speed - old_speed) / old_speed
-                        if diff_ratio > 0.4:  # >40% difference in typing speed
-                            factors[RiskFactor.BEHAVIOR_ANOMALY] = 0.3
-                            score += 0.15
-                            reasons.append("Atypical typing behavior detected")
-                            
-                    # Update running average (alpha = 0.2)
-                    updated_behavior = {
-                        "avg_dwell_ms": (saved_behavior.get("avg_dwell_ms", current_behavior["avg_dwell_ms"]) * 0.8) + (current_behavior["avg_dwell_ms"] * 0.2),
-                        "avg_flight_ms": (saved_behavior.get("avg_flight_ms", current_behavior["avg_flight_ms"]) * 0.8) + (current_behavior["avg_flight_ms"] * 0.2),
-                        "typing_speed_kps": (saved_behavior.get("typing_speed_kps", current_behavior["typing_speed_kps"]) * 0.8) + (current_behavior["typing_speed_kps"] * 0.2),
-                    }
-                    conn.execute("UPDATE users SET behavioral_profile=? WHERE id=?", (json.dumps(updated_behavior), user_id))
-                    conn.commit()
+            # ── Factor 1: Failed login attempts ───────────────────────
+            failed = user["failed_attempts"] or 0
+            if failed >= Config.MAX_FAILED_ATTEMPTS:
+                factors[RiskFactor.FAILED_ATTEMPTS] = 1.0
+                score += 0.4
+                reasons.append(f"Maximum failed attempts reached ({failed})")
+            elif failed >= 3:
+                factors[RiskFactor.FAILED_ATTEMPTS] = 0.6
+                score += 0.2
+                reasons.append(f"Multiple failed attempts ({failed})")
+            elif failed >= 1:
+                factors[RiskFactor.FAILED_ATTEMPTS] = 0.2
+                score += 0.05
+                reasons.append(f"Recent failed attempt ({failed})")
+
+            # ── Factor 2: Odd-hour login (2 AM – 5 AM UTC) ────────────
+            hour = datetime.utcnow().hour
+            if 2 <= hour <= 5:
+                factors[RiskFactor.ODD_HOUR_LOGIN] = 0.5
+                score += 0.1
+                reasons.append("Unusual login time (Late Night)")
+
+            # ── Factor 3 & 4: Device trust score + new device ─────────
+            device_age_days = 0.0
+            login_count = 0
+            if device_fingerprint:
+                device = conn.execute(
+                    "SELECT * FROM devices WHERE device_fingerprint=?", (device_fingerprint,)
+                ).fetchone()
+
+                if device:
+                    reg_date = datetime.fromisoformat(device["registered_at"])
+                    device_age_days = (datetime.utcnow() - reg_date).days
+                    login_count = device["login_count"]
+
+                    trust = device["trust_score"]
+                    if trust < 0.3:
+                        factors[RiskFactor.TRUST_SCORE_LOW] = 1.0 - trust
+                        score += 0.25
+                        reasons.append(f"Low device trust score ({round(trust, 2)})")
+                    elif trust < 0.6:
+                        factors[RiskFactor.TRUST_SCORE_LOW] = 0.5
+                        score += 0.1
+                        reasons.append(f"Moderate device trust score ({round(trust, 2)})")
+
+                    if device["is_blocked"]:
+                        factors[RiskFactor.BLOCKED_DEVICE] = 1.0
+                        score += 0.5
+                        reasons.append("Device is explicitly blocked")
+
+                    if device["login_count"] == 0:
+                        factors[RiskFactor.NEW_DEVICE] = 0.4
+                        score += 0.15
+                        reasons.append("First login from this registered device")
                 else:
-                    # Save initial profile
-                    conn.execute("UPDATE users SET behavioral_profile=? WHERE id=?", (json.dumps(current_behavior), user_id))
-                    conn.commit()
+                    # Completely unknown device
+                    factors[RiskFactor.NEW_DEVICE] = 0.8
+                    score += 0.3
+                    reasons.append("Unrecognized new device")
+            else:
+                reasons.append("No device fingerprint provided")
+                score += 0.2
+
+            # ── Factor 5: Device switching frequency ──────────────────
+            switching_factor = _compute_device_switching(user_id, conn)
+            if switching_factor > 0:
+                factors[RiskFactor.DEVICE_SWITCHING] = switching_factor
+                score += switching_factor * 0.2
+                reasons.append("High frequency of device switching")
+
+            # ── Factor 6: Rapid repeated requests ─────────────────────
+            if _detect_rapid_requests(user_id, conn):
+                factors[RiskFactor.RAPID_REQUESTS] = 0.7
+                score += 0.2
+                reasons.append("Rapid successive login requests detected")
+
+            # ── Factor 7: New IP address ──────────────────────────────
+            if ip_address:
+                ip_factor = _check_new_ip(user_id, ip_address, conn)
+                if ip_factor > 0:
+                    factors[RiskFactor.NEW_IP] = ip_factor
+                    score += ip_factor * 0.15
+                    reasons.append("Login from a previously unseen IP address")
+
+            # ── Factor 8: OTP Failures ────────────────────────────────
+            try:
+                otp_failures = conn.execute(
+                    "SELECT SUM(failed_attempts) as cnt FROM otps WHERE user_id=? AND created_at > datetime('now', '-1 day')",
+                    (user_id,)
+                ).fetchone()
+                if otp_failures and otp_failures["cnt"]:
+                    cnt = otp_failures["cnt"]
+                    factors[RiskFactor.OTP_FAILURES] = min(1.0, cnt * 0.2)
+                    score += min(1.0, cnt * 0.2) * 0.2
+                    reasons.append(f"{cnt} recent OTP verification failures")
             except Exception:
                 pass
 
-    finally:
-        conn.close()
+            # ── Factor 9: Behavioral Biometrics ───────────────────────
+            if behavioral_data:
+                try:
+                    current_behavior = json.loads(behavioral_data)
+                    saved_behavior_str = user.get("behavioral_profile")
+                    
+                    if saved_behavior_str:
+                        saved_behavior = json.loads(saved_behavior_str)
+                        # Compare typing speed
+                        old_speed = saved_behavior.get("typing_speed_kps", 0)
+                        new_speed = current_behavior.get("typing_speed_kps", 0)
+                        
+                        if old_speed > 0 and new_speed > 0:
+                            diff_ratio = abs(new_speed - old_speed) / old_speed
+                            if diff_ratio > 0.4:  # >40% difference in typing speed
+                                factors[RiskFactor.BEHAVIOR_ANOMALY] = 0.3
+                                score += 0.15
+                                reasons.append("Atypical typing behavior detected")
+                                
+                        # Update running average (alpha = 0.2)
+                        updated_behavior = {
+                            "avg_dwell_ms": (saved_behavior.get("avg_dwell_ms", current_behavior["avg_dwell_ms"]) * 0.8) + (current_behavior["avg_dwell_ms"] * 0.2),
+                            "avg_flight_ms": (saved_behavior.get("avg_flight_ms", current_behavior["avg_flight_ms"]) * 0.8) + (current_behavior["avg_flight_ms"] * 0.2),
+                            "typing_speed_kps": (saved_behavior.get("typing_speed_kps", current_behavior["typing_speed_kps"]) * 0.8) + (current_behavior["typing_speed_kps"] * 0.2),
+                        }
+                        conn.execute("UPDATE users SET behavioral_profile=? WHERE id=?", (json.dumps(updated_behavior), user_id))
+                        conn.commit()
+                    else:
+                        # Save initial profile
+                        conn.execute("UPDATE users SET behavioral_profile=? WHERE id=?", (json.dumps(current_behavior), user_id))
+                        conn.commit()
+                except Exception:
+                    pass
 
-    # ── ML Anomaly Adjustment ─────────────────────────────────
-    from ai.anomaly_detector import get_ml_risk_adjustment
-    ml_adj = get_ml_risk_adjustment(user_id, hour, failed, score, device_age_days, login_count)
-    if ml_adj > 0:
-        factors[RiskFactor.ANOMALY_SCORE] = ml_adj
-        score += ml_adj
-        reasons.append(f"AI Anomaly Score: {round(ml_adj * 100)}% unusual pattern")
+        finally:
+            conn.close()
 
-    score = min(1.0, score)
+        # ── ML Anomaly Adjustment ─────────────────────────────────
+        from ai.anomaly_detector import get_ml_risk_adjustment
+        ml_adj = get_ml_risk_adjustment(user_id, hour, failed, score, device_age_days, login_count)
+        if ml_adj > 0:
+            factors[RiskFactor.ANOMALY_SCORE] = ml_adj
+            score += ml_adj
+            reasons.append(f"AI Anomaly Score: {round(ml_adj * 100)}% unusual pattern")
 
-    # If no reasons were added, it means it's a completely normal login
-    if not reasons:
-        reasons.append("Standard login behavior")
+        score = min(1.0, score)
 
-    if score >= Config.RISK_THRESHOLD_BLOCK:
-        action = "block"
-        category = "High Risk"
-    elif score >= Config.RISK_THRESHOLD_CHALLENGE:
-        action = "OTP"
-        category = "Medium Risk"
-    else:
-        action = "allow"
-        category = "Low Risk"
+        # If no reasons were added, it means it's a completely normal login
+        if not reasons:
+            reasons.append("Standard login behavior")
 
-    result = {
-        "score": round(score, 4),
-        "category": category,
-        "reasons": reasons,
-        "factors": factors,
-        "action": action
-    }
-    _save_risk_score(user_id, device_fingerprint, result)
-    return result
+        if score >= Config.RISK_THRESHOLD_BLOCK:
+            action = "block"
+            category = "High Risk"
+        elif score >= Config.RISK_THRESHOLD_CHALLENGE:
+            action = "OTP"
+            category = "Medium Risk"
+        else:
+            action = "allow"
+            category = "Low Risk"
+
+        result = {
+            "score": round(score, 4),
+            "category": category,
+            "reasons": reasons,
+            "factors": factors,
+            "action": action
+        }
+        _save_risk_score(user_id, device_fingerprint, result)
+        return result
+    except Exception as e:
+        logger.error(f"Risk engine failure: {e}")
+        # Fail-safe mode: block access if risk engine cannot be evaluated
+        return {
+            "score": 1.0,
+            "category": "Critical Risk",
+            "reasons": ["Risk engine system failure (Fail-Safe)"],
+            "factors": {"system_error": 1.0},
+            "action": "block"
+        }
 
 
 def _compute_device_switching(user_id: int, conn) -> float:

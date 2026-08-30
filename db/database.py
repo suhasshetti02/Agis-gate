@@ -159,6 +159,24 @@ def init_db():
         )
     """)
 
+    # ── Network Allocations ───────────────────────────────────────
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS network_allocations (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id      INTEGER NOT NULL UNIQUE,
+            user_id         INTEGER NOT NULL,
+            device_id       INTEGER NOT NULL,
+            vlan_id         INTEGER NOT NULL,
+            ip_address      TEXT    UNIQUE NOT NULL,
+            status          TEXT    DEFAULT 'allocated',
+            allocated_at    TEXT    DEFAULT (datetime('now')),
+            released_at     TEXT    DEFAULT NULL,
+            FOREIGN KEY (session_id) REFERENCES sessions(id),
+            FOREIGN KEY (user_id)    REFERENCES users(id),
+            FOREIGN KEY (device_id)  REFERENCES devices(id)
+        )
+    """)
+
     conn.commit()
     _seed_admin(conn)
     conn.close()

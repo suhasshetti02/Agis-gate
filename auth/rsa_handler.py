@@ -55,12 +55,13 @@ def sign_challenge(private_key_pem: str, challenge: str) -> str:
 
 def verify_signature(public_key_pem: str, challenge: str, signature_b64: str) -> bool:
     """Verify a base64-encoded signature against a challenge using a public RSA key."""
+    import binascii
     try:
         public_key = serialization.load_pem_public_key(
             public_key_pem.encode("utf-8"),
             backend=default_backend()
         )
-        signature = base64.b64decode(signature_b64)
+        signature = base64.b64decode(signature_b64, validate=True)
         public_key.verify(
             signature,
             challenge.encode("utf-8"),
@@ -71,7 +72,10 @@ def verify_signature(public_key_pem: str, challenge: str, signature_b64: str) ->
             hashes.SHA256()
         )
         return True
-    except (InvalidSignature, Exception):
+    except InvalidSignature:
+        return False
+    except (ValueError, TypeError, binascii.Error) as e:
+        # Invalid base64 or malformed key
         return False
 
 

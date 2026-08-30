@@ -29,8 +29,10 @@ def create_app() -> Flask:
     app.config["SESSION_COOKIE_SAMESITE"]    = Config.SESSION_COOKIE_SAMESITE
     app.config["PERMANENT_SESSION_LIFETIME"] = Config.PERMANENT_SESSION_LIFETIME
 
-    # Expose Config to all Jinja templates as `config`
-    app.jinja_env.globals["config"] = Config
+    # Expose only safe config variables to Jinja templates
+    app.jinja_env.globals["config"] = {
+        "MAX_DEVICES_PER_USER": Config.MAX_DEVICES_PER_USER
+    }
 
     # ── Initialisation ───────────────────────────────────────
     init_db()
