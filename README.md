@@ -504,7 +504,9 @@ Aegis-Gate is a multi-layered authentication and access control platform that co
 
 # Screenshots
 
-![Screenshot 1](results/Screenshot%202026-08-30%20155315.png)
-![Screenshot 2](results/Screenshot%202026-08-30%20163003.png)
-![Screenshot 3](results/Screenshot%202026-08-30%20163018.png)
-![Screenshot 4](results/Screenshot%202026-08-30%20163040.png)
+<div align="center">
+  <img src="results/Screenshot%202026-08-30%20155315.png" width="49%" alt="Aegis-Gate authentication screen"/>
+  <img src="results/Screenshot%202026-08-30%20163003.png" width="49%" alt="Aegis-Gate dashboard"/>
+  <img src="results/Screenshot%202026-08-30%20163018.png" width="49%" alt="Aegis-Gate access-control view"/>
+  <img src="results/Screenshot%202026-08-30%20163040.png" width="49%" alt="Aegis-Gate administration view"/>
+</div>
