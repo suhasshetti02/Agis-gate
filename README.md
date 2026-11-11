@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="./assets/project-banner.svg" width="100%" alt="Aegis-Gate project banner"/>
+</div>
+
+---
+
 # Aegis-Gate 🛡️
 
 ## AI-Enhanced Cryptographic Network Access Control System
